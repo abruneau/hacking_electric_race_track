@@ -6,82 +6,84 @@ import datetime
 import threading
 import json
 
-lock = threading.Lock()
-pins = {18: "1", 17: "2"}
+import env
+import logfile
 
 threads = []
-f = open("results.txt", 'a')
 run_event = threading.Event()
+laps = 10
 
-def log(f, t, text):
-    try:
-        lock.acquire()
+def setup():
+    # Configure the GPIO pin
+    GPIO.setmode(GPIO.BCM)
+    for sensor in env.sensors:
+        GPIO.setup(env.sensors[sensor], GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-        event = {
-            "time": t.isoformat(),
-            "car": text
-        }
+def cleanup():
+    for sensor in env.sensors:
+        GPIO.cleanup(env.sensors[sensor])
 
-        j = json.dumps(event)
+def read_sensor(sensor, f, run_event):
+    laps_done = -1
 
-        f.write("{0}\n".format(j))
-        f.flush()
-
-        lock.release()
-    except Exception as e: 
-        print("An exception occurred")
-        print(e)
-        
-
-def read_sensor(channel, f, run_event):
-    GPIO.setup(channel, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     # Si on detecte un passage, on enregistre
     # et on attend que la voiture soit passee
-    while run_event.is_set():
-        state = GPIO.input(channel)
+    while run_event.is_set() and laps_done < laps:
+        state = GPIO.input(env.sensors[sensor])
         if not state:
             # la voiture passe
-            log(f, datetime.datetime.now(), pins[channel])
-            print datetime.datetime.now(), pins[channel]
+            logfile.log(f, datetime.datetime.now(), sensor, True)
+            laps_done += 1
             while not state and run_event.is_set():
-                state = GPIO.input(channel)
+                state = GPIO.input(env.sensors[sensor])
                 time.sleep(0.02)  # Pause pour ne pas saturer le processeur
             # La voiture est passee
         time.sleep(0.02)  # Pause pour ne pas saturer le processeur
 
 def start():
     global threads, f, run_event
-
-    # Configure the GPIO pin
-    GPIO.setmode(GPIO.BCM)
+    setup()
+    f = logfile.openfile()
 
     run_event.set()
 
-    car1 = threading.Thread(target=read_sensor, args=(18, f, run_event))
-    car1.start()
-    threads += [car1]
-    car2 = threading.Thread(target=read_sensor, args=(17, f, run_event))
-    car2.start()
-    threads += [car2]
+    logfile.log(f, datetime.datetime.now(), 0, True)
 
-def stop():
-    global threads, f, run_event
-    print "attempting to close threads."
-    run_event.clear()
+    for sensor in env.sensors:
+        t = threading.Thread(target=read_sensor, args=(sensor, f, run_event))
+        t.start()
+        threads += [t]
+
+def running():
+    global threads
+    runs = False
+    for t in threads:
+        if t.isAlive():
+            runs = True
+            break
+
+    return runs
+
+def wait():
+    global threads, f
     for t in threads:
         t.join()
-    print "threads successfully closed"
-    print 'Cleaning up GPIO'
-    GPIO.cleanup()
+
+    logfile.log(f, datetime.datetime.now(), 3, True)
     f.close()
+    cleanup()
+
+def stop():
+    global run_event
+    print "attempting to close threads."
+    run_event.clear()
+    wait()
 
 def main():
-    
+    setup()
     start()
-
     try:
-        while 1:
-            time.sleep(.1)
+        wait()
     except KeyboardInterrupt:
         stop()
 

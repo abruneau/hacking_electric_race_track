@@ -1,2 +1,2 @@
 > results.txt
-sudo python startStop.py
+sudo python main.py
