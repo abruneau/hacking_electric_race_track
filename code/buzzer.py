@@ -18,6 +18,10 @@ def countdown():
         time.sleep(0.9)
     bip(beeper, Tone("A5"), 1)
 
+def finish():
+    beeper = TonalBuzzer(env.BeepPin, octaves=2)
+    bip(beeper, Tone("A5"), 2)
+
 def main():
     try:
         countdown()

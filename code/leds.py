@@ -58,5 +58,15 @@ def countdown():
             light(code)
             time.sleep(1)
     finally:
-        print 'Cleaning up GPIO'
+        _cleanup()
+
+def finish():
+    sequence = [15,0,15,0,15,0,15,0,15,0,15,0]
+
+    _setup()
+    try:
+        for code in sequence:
+            light(code)
+            time.sleep(.2)
+    finally:
         _cleanup()

@@ -3,6 +3,7 @@
 import time
 from gpiozero import Button
 import RPi.GPIO as GPIO # Import Raspberry Pi GPIO library
+from multiprocessing import Process
 
 import env
 import leds
@@ -17,6 +18,15 @@ def print_header(title):
     print "###"
     print "#############################"
 
+def runInParallel(*fns):
+    proc = []
+    for fn in fns:
+        p = Process(target=fn)
+        p.start()
+        proc.append(p)
+    for p in proc:
+        p.join()
+
 def test_button(pin, name):
     try:
         button = Button(pin, pull_up=False)
@@ -29,9 +39,15 @@ def test_button(pin, name):
     except KeyboardInterrupt:
         print('Skip')
 
-def test_leds():
+def test_countdown():
     try:
-        leds.countdown()
+        runInParallel(leds.countdown, buzzer.countdown)
+    except KeyboardInterrupt:
+        print('Skip')
+
+def test_finish():
+    try:
+        runInParallel(leds.finish, buzzer.finish)
     except KeyboardInterrupt:
         print('Skip')
 
@@ -50,12 +66,6 @@ def test_sensor(pin, name):
     finally:
         GPIO.cleanup(pin)
 
-def test_buzzer():
-    try:
-        buzzer.countdown()
-    except KeyboardInterrupt:
-        print('Skip')
-
 def main():
     print_header("Testing Start Button")
     test_button(env.startButton, "Start Button")
@@ -69,11 +79,11 @@ def main():
     print_header("Testing Sensor 2")
     test_sensor(env.sensors[2], "Sensor 2")
 
-    print_header("Testing LEDs")
-    test_leds()
+    print_header("Testing countdown")
+    test_countdown()
 
-    print_header("Test Buzzer")
-    test_buzzer()
+    print_header("Testing finish")
+    test_finish()
     
 
 if __name__ == '__main__':

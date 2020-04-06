@@ -41,6 +41,7 @@ def main():
                 if stopButton.is_pressed and race.running():
                     race.stop()
                 if not stopButton.is_pressed and not race.running():
+                    runInParallel(leds.finish, buzzer.finish)
                     race.wait()
             time.sleep(0.2) 
     except KeyboardInterrupt:
